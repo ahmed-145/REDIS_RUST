@@ -22,13 +22,7 @@ pub async fn command_parser(db: &Database, command: &str) -> Result<String, Stri
                 Ok("$-1\r\n".to_string())
             }
         }
-        ["DEL", key] => {
-            if db.delete(key).await {
-                Ok("$-1\r\n".to_string())
-            } else {
-                Ok("$-0\r\n".to_string())
-            }
-        }
+        ["DEL", key] => Ok(format!(":{}\r\n", u8::from(db.delete(key).await))),
         //LIST
         ["LPUSH", key, value] => {
             db.lpush(key.to_string(), value.to_string()).await;
@@ -131,5 +125,18 @@ pub async fn command_parser(db: &Database, command: &str) -> Result<String, Stri
         }
 
         _ => Ok("-ERR\r\nUnknow commnd, please try again!!".to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn del_returns_integer_for_hit_and_miss() {
+        let db = Database::new();
+        command_parser(&db, "SET key value").await.unwrap();
+        assert_eq!(command_parser(&db, "DEL key").await.unwrap(), ":1\r\n");
+        assert_eq!(command_parser(&db, "DEL key").await.unwrap(), ":0\r\n");
     }
 }
