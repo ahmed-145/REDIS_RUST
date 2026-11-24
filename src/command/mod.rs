@@ -84,11 +84,7 @@ pub async fn command_parser(db: &Database, command: &str) -> Result<String, Stri
         }
 
         ["SISMEMBER", key, member] => {
-            let ismember = db.sismember(key, member).await;
-            Ok(format!(
-                "${}\r\n",
-                if ismember { "FOUND!" } else { "NOT FOUND!" }
-            ))
+            Ok(format!(":{}\r\n", u8::from(db.sismember(key, member).await)))
         }
 
         //Ordered SET
@@ -138,5 +134,18 @@ mod tests {
         command_parser(&db, "SET key value").await.unwrap();
         assert_eq!(command_parser(&db, "DEL key").await.unwrap(), ":1\r\n");
         assert_eq!(command_parser(&db, "DEL key").await.unwrap(), ":0\r\n");
+    }
+
+    #[tokio::test]
+    async fn sismember_returns_integer_for_hit_and_misses() {
+        let db = Database::new();
+        command_parser(&db, "SADD colors blue").await.unwrap();
+        for (command, expected) in [
+            ("SISMEMBER colors blue", ":1\r\n"),
+            ("SISMEMBER colors red", ":0\r\n"),
+            ("SISMEMBER missing blue", ":0\r\n"),
+        ] {
+            assert_eq!(command_parser(&db, command).await.unwrap(), expected);
+        }
     }
 }
