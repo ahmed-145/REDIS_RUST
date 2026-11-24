@@ -7,7 +7,7 @@ pub async fn command_parser(db: &Database, command: &str) -> Result<String, Stri
 
     match splitted_commad.as_slice() {
         ["SET", key, value, "EXP", ttl] => {
-            let ttl = ttl.parse::<u64>().expect("Invalid time to live value");
+            let ttl = ttl.parse::<u64>().map_err(|_| "Invalid time to live value")?;
             db.set(key.to_string(), value.to_string(), Some(ttl)).await;
             Ok("+OK\r\n".to_string())
         }
@@ -49,6 +49,10 @@ pub async fn command_parser(db: &Database, command: &str) -> Result<String, Stri
         ["LRANGE", key, start, end] => {
             let start = start.parse::<usize>().map_err(|_| "Invalid start index")?;
             let end = end.parse::<usize>().map_err(|_| "Invalid start index")?;
+
+            if end < start {
+                return Err("End index must not be less than start index".to_string());
+            }
 
             if let Some(list) = db.lrange(start, end, key).await {
                 let mut response = format!("*{}\r\n", list.len());
@@ -101,6 +105,10 @@ pub async fn command_parser(db: &Database, command: &str) -> Result<String, Stri
         ["ZRANGE", key, start, end] => {
             let start = start.parse::<usize>().map_err(|_| "Invalid start index")?;
             let end = end.parse::<usize>().map_err(|_| "Invalid end index")?;
+            if end < start {
+                return Err("End index must not be less than start index".to_string());
+            }
+
             if let Some(members) = db.zrange(&key.to_string(), start, end).await {
                 let mut response = format!("*{}\r\n", members.len());
                 for member in members {
@@ -164,5 +172,20 @@ mod tests {
         let reply = command_parser(&db, "ZADD leaderboard 2.5 alice").await.unwrap();
         assert_eq!(reply, ":1\r\n");
         assert_eq!(db.zscore("leaderboard", "alice").await, Some(2.5));
+    }
+
+    #[tokio::test]
+    async fn invalid_exp_and_reversed_ranges_return_errors() {
+        let db = Database::new();
+        command_parser(&db, "RPUSH items first").await.unwrap();
+        command_parser(&db, "ZADD leaderboard 1 alice").await.unwrap();
+        for (command, expected) in [
+            ("SET key value EXP nope", "Invalid time to live value"),
+            ("LRANGE items 2 0", "End index must not be less than start index"),
+            ("ZRANGE leaderboard 2 0", "End index must not be less than start index"),
+        ] {
+            assert_eq!(command_parser(&db, command).await.unwrap_err(), expected);
+        }
+        assert_eq!(db.get("key").await, None);
     }
 }
