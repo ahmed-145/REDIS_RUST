@@ -46,7 +46,7 @@ pub async fn command_parser(db: &Database, command: &str) -> Result<String, Stri
                 Ok("+OK\r\n".to_string())
             }
         }
-        ["LRANGE", start, end, key] => {
+        ["LRANGE", key, start, end] => {
             let start = start.parse::<usize>().map_err(|_| "Invalid start index")?;
             let end = end.parse::<usize>().map_err(|_| "Invalid start index")?;
 
@@ -88,7 +88,7 @@ pub async fn command_parser(db: &Database, command: &str) -> Result<String, Stri
         }
 
         //Ordered SET
-        ["ZADD", score, member, key] => {
+        ["ZADD", key, score, member] => {
             let score = score.parse::<f64>().map_err(|_| "Invalid score")?;
             let added = db.zadd(key.to_string(), score, member.to_string()).await;
             Ok(format!(":{}\r\n", if added { 1 } else { 0 }))
@@ -147,5 +147,22 @@ mod tests {
         ] {
             assert_eq!(command_parser(&db, command).await.unwrap(), expected);
         }
+    }
+
+    #[tokio::test]
+    async fn lrange_parses_key_before_indices() {
+        let db = Database::new();
+        command_parser(&db, "RPUSH items first").await.unwrap();
+        command_parser(&db, "RPUSH items second").await.unwrap();
+        let result = command_parser(&db, "LRANGE items 1 1").await.unwrap();
+        assert_eq!(result, "*1\r\n$6\r\nsecond\r\n");
+    }
+
+    #[tokio::test]
+    async fn zadd_parses_key_then_score_then_member() {
+        let db = Database::new();
+        let reply = command_parser(&db, "ZADD leaderboard 2.5 alice").await.unwrap();
+        assert_eq!(reply, ":1\r\n");
+        assert_eq!(db.zscore("leaderboard", "alice").await, Some(2.5));
     }
 }
