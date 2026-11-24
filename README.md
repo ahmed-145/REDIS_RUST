@@ -8,7 +8,6 @@ A Redis-inspired in-memory data store implemented in Rust, supporting core data 
 ### Implemented Data Structures
 - **Strings**
   - `SET <key> <value>`, `GET <key>`, `DEL <key>`
-  - `TTL <key>`
   
 - **Lists**
   - `LPUSH <key> <value>`, `RPUSH <key> <value>`
@@ -21,7 +20,7 @@ A Redis-inspired in-memory data store implemented in Rust, supporting core data 
 
 - **Sorted Sets**
   - `ZADD <key> <score> <member>`, `ZREM <key> <member>`
-  - `ZRANGE <key> <start> <stop> [WITHSCORES]`
+  - `ZRANGE <key> <start> <stop>`
 
 For example, `LRANGE items 0 2` reads the first three list entries, and
 `ZADD leaderboard 2.5 alice` adds Alice with a score of 2.5.

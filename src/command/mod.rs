@@ -188,4 +188,11 @@ mod tests {
         }
         assert_eq!(db.get("key").await, None);
     }
+
+    #[test]
+    fn readme_omits_unsupported_ttl_and_withscores() {
+        let readme = include_str!("../../README.md");
+        assert!(!readme.contains("TTL <key>"));
+        assert!(!readme.contains("WITHSCORES"));
+    }
 }
